@@ -10,6 +10,7 @@ import NewTicketPage from './pages/author/NewTicketPage';
 import MyTicketsPage from './pages/author/MyTicketsPage';
 import TicketQueuePage from './pages/admin/TicketQueuePage';
 import TicketDetailPage from './pages/admin/TicketDetailPage';
+import AiUsagePage from './pages/admin/AiUsagePage';
 import NotFoundPage from './pages/NotFoundPage';
 
 const AUTHOR_LINKS = [
@@ -17,7 +18,10 @@ const AUTHOR_LINKS = [
   { to: '/author/tickets', label: 'My Tickets', icon: 'inbox', end: true },
   { to: '/author/tickets/new', label: 'New Query', icon: 'messagePlus' },
 ];
-const ADMIN_LINKS = [{ to: '/admin/tickets', label: 'Ticket Queue', icon: 'queue' }];
+const ADMIN_LINKS = [
+  { to: '/admin/tickets', label: 'Ticket Queue', icon: 'queue' },
+  { to: '/admin/ai-usage', label: 'AI Usage', icon: 'trending' },
+];
 
 export default function App() {
   return (
@@ -45,6 +49,7 @@ export default function App() {
             <Route element={<PortalLayout role="admin" links={ADMIN_LINKS} />}>
               <Route path="/admin/tickets" element={<TicketQueuePage />} />
               <Route path="/admin/tickets/:id" element={<TicketDetailPage />} />
+              <Route path="/admin/ai-usage" element={<AiUsagePage />} />
             </Route>
           </Route>
 

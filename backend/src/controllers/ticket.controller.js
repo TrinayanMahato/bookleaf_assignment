@@ -53,10 +53,14 @@ export const createTicket = async (req, res) => {
       size: f.size,
     }));
 
+    // The id is chosen up front so the classification call can be logged against this ticket.
+    const ticketId = new mongoose.Types.ObjectId();
+
     // Never throws: falls back to keyword rules if the AI is down, so the ticket is always created.
-    const classification = await classifyTicket({ subject, description, book });
+    const classification = await classifyTicket({ subject, description, book, ticketId });
 
     const ticket = await Ticket.create({
+      _id: ticketId,
       author: req.user.id,
       book: book?._id ?? null,
       subject,

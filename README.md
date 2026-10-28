@@ -99,6 +99,7 @@ Notes on the free tier:
 - **Internal notes:** visible to staff only.
 - **Assign to me / unassign.**
 - **Live queue:** new tickets and other admins' changes appear without a refresh.
+- **AI usage:** every Gemini request with its model, result, latency and token usage, plus totals per action.
 
 ### Ticket status
 Status is never set by hand:
@@ -147,7 +148,7 @@ Where the brief left a decision open, this is what I assumed:
 ```
 backend/src
 ├── config/        db connection, Knowledge Base (split by category)
-├── models/        Admin, Author, Book, Ticket
+├── models/        Admin, Author, Book, Ticket, AiCall (AI usage log)
 ├── middleware/    authenticate (JWT), authorize(...roles), uploadAttachments (multer)
 ├── controllers/   one per area: validate (Zod) → try { DB / action } catch → response
 ├── routes/        auth, authors, tickets, admin, events
@@ -189,7 +190,10 @@ frontend/src
 
 **Cost awareness**
 - **Classification:** one call per ticket, with a small input and `maxOutputTokens` capped.
-- **Drafts:** generated only when an admin clicks the button, never automatically. Each prompt carries one Knowledge Base section rather than the whole thing, and the draft is saved so reopening a ticket doesn't regenerate it.
+- **Drafts:** generated only when an admin clicks the button, never automatically. Each prompt carries one Knowledge Base section rather than the whole thing (about 400–500 of its ~1,300 tokens), and the draft is saved so reopening a ticket doesn't regenerate it.
+- **Conversation history:** each draft gets the original query plus only the last 6 replies, so long threads don't make every draft more expensive.
+- **Usage log:** every Gemini request, including each retry and fallback, is stored in the `aicalls` collection with its action, model, attempt, result, latency and token counts (prompt, output, thinking, total) from Gemini's `usageMetadata`. Admins see totals and the full list on the **AI Usage** page (`GET /api/admin/ai-usage`). Logging is fire-and-forget, so it never slows down or breaks the AI feature.
+- **What the log showed:** a classification uses about 630 tokens, of which ~220 are model "thinking" for a 22-token answer, and a draft uses about 900. Turning thinking off for classification is the next cheap saving. The log also shows the cost of retries: a failed attempt uses no tokens but adds latency.
 
 **Graceful degradation**
 - **Retries:** overloaded (503), rate-limited (429) and timed-out calls are retried with backoff, and then the fallback model is tried.

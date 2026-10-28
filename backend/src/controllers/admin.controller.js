@@ -214,7 +214,7 @@ export const generateTicketDraft = async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    const body = await generateDraft({ ticket, book: ticket.book, author: ticket.author });
+    const body = await generateDraft({ ticket, book: ticket.book, author: ticket.author, adminId: req.user.id });
 
     ticket.aiDraft = { body, generatedAt: new Date() };
     await ticket.save();

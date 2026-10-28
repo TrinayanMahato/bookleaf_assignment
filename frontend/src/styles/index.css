@@ -415,6 +415,11 @@ td .category { max-width: 180px; white-space: normal; align-items: flex-start; l
 td .category .icon { margin-top: 1px; flex: none; }
 .table-foot { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); background: var(--surface-2); font-size: 0.8125rem; color: var(--muted); }
 .page-btns { display: flex; gap: 0.5rem; }
+th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+td.strong { font-weight: 600; color: var(--text); }
+td.nowrap { white-space: nowrap; }
+tr.row-static { cursor: default; }
+.usage-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
 
 /* ==========================================================================
    Admin: ticket detail
@@ -661,6 +666,7 @@ td .category .icon { margin-top: 1px; flex: none; }
   .toolbar-spacer { display: none; }
   .demo-box { flex-direction: column; align-items: stretch; }
   .stats-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .usage-split { grid-template-columns: minmax(0, 1fr); }
   .stats-6 .stat { flex-direction: row; gap: 0.6rem; padding: 0.8rem; }
   .stats-6 .stat-hint { display: none; }
   .stat { padding: 0.9rem; }

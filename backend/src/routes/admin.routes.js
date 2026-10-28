@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
 import { listTickets, getTicket, updateTicket, addNote, generateTicketDraft, sendReply } from '../controllers/admin.controller.js';
+import { getAiUsage } from '../controllers/aiUsage.controller.js';
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.patch('/tickets/:id', updateTicket);
 router.post('/tickets/:id/notes', addNote);
 router.post('/tickets/:id/draft', generateTicketDraft);
 router.post('/tickets/:id/replies', sendReply);
+router.get('/ai-usage', getAiUsage);
 
 export default router;

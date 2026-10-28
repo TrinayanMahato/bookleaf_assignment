@@ -28,7 +28,7 @@ Two portals on one API:
   - Overloaded or rate-limited calls are retried with backoff, then a fallback model is tried.
   - If the AI still fails, classification falls back to keyword rules, so ticket creation never fails.
   - The draft endpoint returns 503 and the admin writes the reply manually.
-- **Cost:** one small classification call per ticket, drafts only when requested, and a single Knowledge Base section per prompt. The API key exists only in server environment variables.
+- **Cost:** one small classification call per ticket, drafts only when requested, a single Knowledge Base section and only the last 6 replies per draft prompt. Every Gemini request is logged with its token usage, visible on the admin **AI Usage** page, so cost is measured rather than guessed (about 630 tokens per classification and 900 per draft). The API key exists only in server environment variables.
 
 ## Trade-offs and what I'd do next
 - **Scaling SSE:** a `res` object is a live connection, so it can't be stored in Redis. Across multiple instances I'd keep connections local and use **Redis Pub/Sub**: the instance that receives the reply publishes it, and the instance holding the author's connection delivers it.

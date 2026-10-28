@@ -1,6 +1,7 @@
 import { GoogleGenAI, ApiError } from '@google/genai';
 import { z } from 'zod';
 import { CATEGORIES, PRIORITIES } from '../models/Ticket.js';
+import AiCall from '../models/AiCall.js';
 import { COMPANY_OVERVIEW, TONE_GUIDELINES, CATEGORY_KNOWLEDGE } from '../config/knowledgeBase.js';
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
@@ -11,6 +12,7 @@ const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS || 'gemini-flash-lit
   .filter((m) => m && m !== MODEL);
 const TIMEOUT_MS = 30_000;
 const RETRY_DELAYS_MS = [1_000, 3_000]; // per model, before giving up on it
+const MAX_HISTORY_MESSAGES = 6; // replies sent with each draft request
 
 // Created lazily so the server still boots (and falls back) when no key is configured.
 let client = null;
@@ -34,19 +36,44 @@ const RETRYABLE_STATUSES = new Set([429, 500, 503, 504]);
 const isRetryable = (err) => !(err instanceof ApiError) || RETRYABLE_STATUSES.has(err.status); // network errors and timeouts too
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Records one attempt in the ai_calls collection. Fire-and-forget: a logging failure never breaks the AI feature.
+const recordCall = ({ kind, model, attempt, startedAt, response, err, context }) => {
+  const usage = response?.usageMetadata ?? {};
+  AiCall.create({
+    action: kind,
+    model,
+    attempt: attempt + 1,
+    success: !err,
+    errorStatus: err instanceof ApiError ? err.status : null,
+    errorMessage: err ? err.message.slice(0, 300) : null,
+    latencyMs: Date.now() - startedAt,
+    promptTokens: usage.promptTokenCount ?? 0,
+    outputTokens: usage.candidatesTokenCount ?? 0,
+    thinkingTokens: usage.thoughtsTokenCount ?? 0,
+    totalTokens: usage.totalTokenCount ?? 0,
+    ticket: context.ticketId ?? null,
+    admin: context.adminId ?? null,
+  }).catch((logErr) => console.error('Could not record AI call:', logErr.message));
+};
+
 // Gemini often answers 503 "high demand" for a few seconds at a time, so one failed call
 // shouldn't fail the feature: retry the same model with backoff, then try each fallback model.
 // Errors that retrying can't fix (bad key, bad request) are thrown straight away.
-const generateContent = async (ai, request, action) => {
+// `kind` ('classify' | 'draft') and `context` ({ ticketId, adminId }) are only used for the usage log.
+const generateContent = async (ai, request, kind, context = {}) => {
+  const action = kind === 'classify' ? 'classifying' : 'drafting';
   let lastErr;
   for (const model of [MODEL, ...FALLBACK_MODELS]) {
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+      const startedAt = Date.now();
       try {
         const response = await ai.models.generateContent({ ...request, model });
+        recordCall({ kind, model, attempt, startedAt, response, context });
         if (model !== MODEL || attempt > 0) console.info(`AI ${action} succeeded with ${model} (attempt ${attempt + 1})`);
         return response;
       } catch (err) {
         lastErr = err;
+        recordCall({ kind, model, attempt, startedAt, err, context });
         logAIError(err, `${action} with ${model}`);
         if (err instanceof ApiError && err.status === 404) break; // model retired: go to the next one
         if (!isRetryable(err)) throw err;
@@ -116,7 +143,7 @@ export const fallbackClassification = (subject, description) => {
 };
 
 // Returns { category, priority, reason, source }. Never throws: any AI failure falls back to keyword rules.
-export const classifyTicket = async ({ subject, description, book }) => {
+export const classifyTicket = async ({ subject, description, book, ticketId }) => {
   const ai = getClient();
   if (!ai) return fallbackClassification(subject, description);
 
@@ -129,7 +156,7 @@ export const classifyTicket = async ({ subject, description, book }) => {
         responseJsonSchema: z.toJSONSchema(ClassificationSchema),
         maxOutputTokens: 1024,
       },
-    }, 'classifying');
+    }, 'classify', { ticketId });
 
     // The schema constrains Gemini's output; Zod re-checks it before it touches the DB.
     const parsed = ClassificationSchema.safeParse(JSON.parse(response.text ?? 'null'));
@@ -203,13 +230,18 @@ Write plain text only (no markdown), 120-220 words. Output only the reply itself
 };
 
 // Returns the draft text. Throws AIUnavailableError on any AI failure.
-export const generateDraft = async ({ ticket, book, author }) => {
+export const generateDraft = async ({ ticket, book, author, adminId }) => {
   const ai = getClient();
   if (!ai) throw new AIUnavailableError('AI is not configured');
 
-  const history = ticket.messages
-    .map((m) => `${m.senderModel === 'Admin' ? 'BookLeaf' : 'Author'}: ${m.body}`)
-    .join('\n\n');
+  // Only the latest replies: the original query is always included above, and older
+  // back-and-forth adds tokens on every draft without changing what the next reply should say.
+  const recent = ticket.messages.slice(-MAX_HISTORY_MESSAGES);
+  const omitted = ticket.messages.length - recent.length;
+  const history = [
+    ...(omitted > 0 ? [`(${omitted} earlier message${omitted > 1 ? 's' : ''} omitted)`] : []),
+    ...recent.map((m) => `${m.senderModel === 'Admin' ? 'BookLeaf' : 'Author'}: ${m.body}`),
+  ].join('\n\n');
   const attachmentNote = ticket.attachments.length
     ? `The author attached ${ticket.attachments.length} file(s): ${ticket.attachments.map((a) => a.originalName).join(', ')}.`
     : 'No attachments.';
@@ -239,7 +271,7 @@ Draft the next reply from BookLeaf to this author.`;
         systemInstruction: buildDraftSystemPrompt(ticket.category),
         maxOutputTokens: 2048,
       },
-    }, 'drafting');
+    }, 'draft', { ticketId: ticket._id, adminId });
 
     const text = response.text?.trim();
     if (!text) {

@@ -213,7 +213,7 @@ Overrides the AI's classification and/or changes the assignee. Send at least one
 
 ### `POST /admin/tickets/:id/draft`
 
-Generates a reply draft with Gemini. It runs only when an admin asks for it, and takes no body: the ticket, book and author data are loaded from the database, never sent by the client. The prompt carries the BookLeaf tone guidelines plus the Knowledge Base section for this ticket's category. The draft is saved on the ticket.
+Generates a reply draft with Gemini. It runs only when an admin asks for it, and takes no body: the ticket, book and author data are loaded from the database, never sent by the client. The prompt carries the BookLeaf tone guidelines, the Knowledge Base section for this ticket's category, and the last 6 replies of the conversation. The draft is saved on the ticket, and each Gemini attempt is recorded in the AI usage log.
 
 **200** `{ "draft": { "body": "Dear Sneha, ...", "generatedAt": "..." } }`
 
@@ -228,6 +228,42 @@ Generates a reply draft with Gemini. It runs only when an admin asks for it, and
 `body` is 1–5000 characters; `aiDrafted` is optional and records whether the reply started from the AI draft. Adds the message, sets the status to **Answered**, and pushes the updated ticket to every open tab of that author.
 
 **201** `{ "ticket": { ... }, "delivered": 1 }`, where `delivered` is the number of the author's tabs that received it live (0 means they'll see it when they next load their tickets).
+
+### `GET /admin/ai-usage`
+
+Lists every Gemini request (one row per attempt, so retries and fallbacks are visible) with totals. Every query parameter is optional.
+
+| Param | Values |
+|---|---|
+| `action` | `classify` or `draft` |
+| `from`, `to` | Dates (`YYYY-MM-DD`); `to` includes the whole day |
+| `page`, `limit` | Default `1` and `25`, `limit` at most 100 |
+
+**200**
+
+```json
+{
+  "summary": {
+    "calls": 5, "failed": 3,
+    "promptTokens": 1122, "outputTokens": 194, "thinkingTokens": 219, "totalTokens": 1535,
+    "avgLatencyMs": 1433,
+    "byAction": [{ "key": "classify", "calls": 1, "failed": 0, "totalTokens": 628, "...": "..." }],
+    "byModel": [{ "key": "gemini-3.5-flash", "calls": 4, "...": "..." }]
+  },
+  "calls": [
+    {
+      "action": "draft", "model": "gemini-flash-lite-latest", "attempt": 1, "success": true,
+      "errorStatus": null, "errorMessage": null, "latencyMs": 1365,
+      "promptTokens": 735, "outputTokens": 172, "thinkingTokens": 0, "totalTokens": 907,
+      "ticket": { "_id": "...", "subject": "..." }, "admin": { "_id": "...", "name": "BookLeaf Support" },
+      "createdAt": "..."
+    }
+  ],
+  "page": 1, "pages": 1, "total": 5
+}
+```
+
+Failed attempts have `success: false`, the Gemini HTTP status in `errorStatus` (null for timeouts), and zero tokens.
 
 ---
 
