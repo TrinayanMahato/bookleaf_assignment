@@ -44,7 +44,25 @@ npm run dev                 # http://localhost:5173
 | Admin | `admin@bookleaf.com` | `admin123` |
 | Admin | `ops@bookleaf.com` | `admin123` |
 
-The login pages have a **Use demo account** button. Sessions are stored per browser tab, so you can be signed in as an author in one tab and as an admin in another and watch replies arrive live.
+The login pages have a **Fill in** button for the demo account. Sessions are stored per browser tab, so you can be signed in as an author in one tab and as an admin in another and watch replies arrive live.
+
+<details>
+<summary>All 10 sample authors (password <code>author123</code>)</summary>
+
+| Author | Email | Books |
+|---|---|---|
+| AUTH001 Priya Sharma | `priya.sharma@email.com` | 2 live |
+| AUTH002 Rohit Kapoor | `rohit.kapoor@email.com` | 2 live |
+| AUTH003 Ananya Reddy | `ananya.reddy@email.com` | 1 live |
+| AUTH004 Vikram Joshi | `vikram.joshi@email.com` | 2 live |
+| AUTH005 Meera Nair | `meera.nair@email.com` | 2 live |
+| AUTH006 Arjun Malhotra | `arjun.malhotra@email.com` | 1 live |
+| AUTH007 Sneha Kulkarni | `sneha.kulkarni@email.com` | 2 live, 1 in production (Cover Design) |
+| AUTH008 Farhan Sheikh | `farhan.sheikh@email.com` | 1 live |
+| AUTH009 Kavita Deshmukh | `kavita.deshmukh@email.com` | 1 live, 1 in production (Typesetting) |
+| AUTH010 Diya Chatterjee | `diya.chatterjee@email.com` | 2 live |
+
+</details>
 
 ### Environment variables (`backend/.env`)
 
@@ -168,7 +186,7 @@ frontend/src
 └── pages/         Landing · auth/ · author/ · admin/
 ```
 
-**Data model:** four collections. `authors` and `admins` store bcrypt password hashes, which are never returned by default. Each document in `books` points to its author. Each `tickets` document holds its own conversation, internal notes (hidden unless explicitly requested), the AI classification and the last AI draft. A numeric `priorityRank` plus a compound index keeps the queue sort cheap.
+**Data model:** five collections. `authors` and `admins` store bcrypt password hashes, which are never returned by default. Each document in `books` points to its author. Each `tickets` document holds its own conversation, internal notes (hidden unless explicitly requested), the AI classification and the last AI draft. A numeric `priorityRank` plus a compound index keeps the queue sort cheap. `aicalls` logs every Gemini request with its token usage.
 
 **Security and access control**
 - **Auth:** bcrypt password hashes and JWTs carrying `{ id, role }`.
