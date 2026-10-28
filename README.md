@@ -113,7 +113,7 @@ frontend/src
 - **Validation:** every body, query and route parameter goes through Zod.
 - **Uploads:** checked for file type and size, saved under random names, and served only after an ownership check. File names are validated so `../` paths can't escape the upload folder.
 
-**Real-time updates (SSE):** replies only flow from the server to the author, so Server-Sent Events are enough and WebSockets aren't needed. `GET /api/events` keeps each open tab's connection in an in-memory `Map` keyed by author ID. When an admin replies, the server looks up that author's connections and pushes the updated ticket. Browsers reconnect on their own and refetch on reconnect, so a server restart loses nothing. The in-memory map does limit the backend to one instance; scaling out would need a Redis pub/sub layer.
+**Real-time updates (SSE):** replies only flow from the server to the author, so Server-Sent Events are enough and WebSockets aren't needed. `GET /api/events` keeps each open tab's connection in an in-memory `Map` keyed by author ID. When an admin replies, the server looks up that author's connections and pushes the updated ticket. Browsers reconnect on their own and refetch on reconnect, so a server restart loses nothing. The in-memory map does limit the backend to one instance; see [Production considerations](#production-considerations) for scaling out with Redis.
 
 ---
 
@@ -140,8 +140,40 @@ frontend/src
 
 ---
 
+## Production considerations
+
+### Redis for real-time connections across servers
+
+Today, each author's open SSE connections (the Express `res` objects) are kept in a `Map` in the Node process's memory. That works because there is only one server: the admin's reply and the author's connection are always handled by the same process.
+
+In production the backend runs on several instances behind a load balancer. The author's connection might be held by server A while the admin's reply lands on server B. Server B has no `res` for that author, so the live update would be lost.
+
+**The fix is Redis.** One detail matters: a `res` object is a live network connection, so it can't be stored in Redis or any database. Each server keeps the `res` objects for its own connections in memory, as now. Redis records which author is connected and passes events between the servers:
+
+1. **Connection registry:** when an author connects, the server records `authorId → serverId` in Redis (e.g. a Redis set per author) and removes the entry when they disconnect. Any instance can then check whether, and where, an author is online.
+2. **Pub/Sub for delivery:** when an admin replies, the server handling the reply publishes `{ authorId, event, ticket }` to a Redis channel. Every instance subscribes to that channel. Each one checks its own local `Map` and writes to the author's `res` if it holds that connection.
+
+This also survives a single server restarting: the author's browser reconnects to any healthy instance, registers again, and refetches anything it missed. The code change is contained in `services/sse.service.js`: `notifyAuthor` / `notifyAdmins` publish to Redis instead of writing directly, and a subscriber writes to the local connections.
+
+### Background job for an instant AI draft
+
+Right now the AI draft is generated **on demand**: when the admin clicks *Generate AI draft*, the request waits on Gemini, which takes about 5–15 s and longer when the model is overloaded and retries kick in. This keeps cost down, because drafts are only generated for tickets an admin actually works on.
+
+If drafts should be **ready the moment an admin opens a ticket**, generate them in a background job:
+
+1. When a ticket is created, save it and respond to the author straight away, then put a `generate-draft` job on a queue (e.g. **BullMQ on Redis**).
+2. A separate worker process takes the job, calls Gemini with the same prompt as today, and saves the result to `ticket.aiDraft`.
+3. The worker sends a `ticket:changed` event so an admin viewing the ticket sees the draft appear. The *Generate AI draft* button stays available for regenerating it.
+
+The queue also deals with AI unavailability for you: failed jobs retry with backoff, and the author's request never waits on the AI. The trade-off is cost, because every ticket gets a draft, including ones resolved without it. A middle ground is to pre-generate drafts only for **Critical and High** priority tickets and keep the on-demand button for the rest.
+
+Ticket **classification** could move to the same queue. It currently runs inline because the queue needs the priority immediately, and the keyword fallback already guarantees ticket creation never fails.
+
+---
+
 ## Known limitations / next steps
 - Authors can't reply within a ticket; a follow-up means raising a new ticket.
-- SSE connections and uploads are stored on the server itself. For production, use Redis pub/sub and object storage (S3 or similar).
+- Live connections are tracked in one server's memory and uploads are saved to its disk. For production, use Redis (see above) and object storage such as S3.
+- AI drafts are generated on demand rather than in a background job (see above).
 - No rate limiting on login and no refresh tokens yet.
 - No automated test suite; the flows were tested end to end against the running API and in the browser.
