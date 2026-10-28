@@ -1,4 +1,4 @@
-import { OVERDUE_HOURS } from './constants';
+import { ACTIVE_STATUSES, OVERDUE_HOURS } from './constants';
 
 const inr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 
@@ -20,7 +20,7 @@ export const formatAge = (value) => {
 };
 
 export const isOverdue = (ticket) =>
-  ticket.status === 'Pending' &&
+  ACTIVE_STATUSES.includes(ticket.status) &&
   (Date.now() - new Date(ticket.createdAt)) / 3_600_000 > OVERDUE_HOURS[ticket.priority];
 
 export const formatFileSize = (bytes) => (bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);

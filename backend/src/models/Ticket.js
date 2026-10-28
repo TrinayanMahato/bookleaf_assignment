@@ -9,8 +9,11 @@ export const CATEGORIES = [
   'General Inquiry',
 ];
 export const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
-// Status is never set by hand: Pending when the author raises a ticket, Answered once an admin replies.
-export const STATUSES = ['Pending', 'Answered'];
+// Open when the author raises a ticket, In Progress when an admin picks it up, Resolved when an admin
+// replies. Admins can also set any status by hand, e.g. to close or reopen a ticket.
+export const STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
+// Tickets still waiting on the team: these count towards the queue stats and the overdue flag.
+export const ACTIVE_STATUSES = ['Open', 'In Progress'];
 
 // Mongo sorts strings alphabetically, so the queue sorts on this number instead.
 const PRIORITY_RANK = { Critical: 1, High: 2, Medium: 3, Low: 4 };
@@ -48,7 +51,7 @@ const ticketSchema = new mongoose.Schema(
         size: Number,
       },
     ],
-    status: { type: String, enum: STATUSES, default: 'Pending', index: true },
+    status: { type: String, enum: STATUSES, default: 'Open', index: true },
     category: { type: String, enum: CATEGORIES, default: 'General Inquiry', index: true },
     priority: { type: String, enum: PRIORITIES, default: 'Medium', index: true },
     priorityRank: { type: Number, default: PRIORITY_RANK.Medium },

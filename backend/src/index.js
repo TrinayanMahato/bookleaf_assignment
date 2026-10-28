@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import { connectDB } from './config/db.js';
+import { migrateTicketStatuses } from './config/migrate.js';
 import authRoutes from './routes/auth.routes.js';
 import authorRoutes from './routes/author.routes.js';
 import ticketRoutes from './routes/ticket.routes.js';
@@ -32,6 +33,7 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 4000;
 
 connectDB()
+  .then(migrateTicketStatuses)
   .then(() => app.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`)))
   .catch((err) => {
     console.error('Failed to connect to MongoDB:', err.message);

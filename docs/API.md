@@ -48,7 +48,7 @@ Every error has the same shape:
 
 | Field | Values |
 |---|---|
-| `status` | `Pending`, `Answered` (set automatically, never by hand) |
+| `status` | `Open`, `In Progress`, `Resolved`, `Closed` |
 | `priority` | `Critical`, `High`, `Medium`, `Low` |
 | `category` | `Royalty & Payments`, `ISBN & Metadata Issues`, `Printing & Quality`, `Distribution & Availability`, `Book Status & Production Updates`, `General Inquiry` |
 | `classificationSource` | `ai`, `fallback` (keyword rules used because the AI was unavailable), `admin` (manual override) |
@@ -120,7 +120,7 @@ Books still in production have `null` for `isbn`, `mrp` and `publicationDate`.
 Same roles and validation. Returns the author's tickets, most recently updated first. Each ticket has its `book` (`bookId`, `title`) and its messages with the sender's `name` filled in. `internalNotes` and `aiDraft` are never included.
 
 ```json
-{ "authorId": "AUTH007", "count": 1, "tickets": [ { "_id": "...", "subject": "...", "status": "Answered", "messages": [ ... ] } ] }
+{ "authorId": "AUTH007", "count": 1, "tickets": [ { "_id": "...", "subject": "...", "status": "Resolved", "messages": [ ... ] } ] }
 ```
 
 ---
@@ -168,7 +168,7 @@ The ticket queue, sorted by priority (Critical first) and then oldest first.
 
 | Query param | Example | Notes |
 |---|---|---|
-| `status` | `Pending` | Comma-separated list allowed |
+| `status` | — | Comma-separated list allowed, e.g. `Open,In Progress` (the UI's *Needs attention* view) |
 | `category` | `Royalty & Payments,Printing & Quality` | Comma-separated list allowed |
 | `priority` | `Critical,High` | Comma-separated list allowed |
 | `assigned` | `me` or `unassigned` | |
@@ -179,7 +179,7 @@ The ticket queue, sorted by priority (Critical first) and then oldest first.
 
 ```json
 {
-  "tickets": [ { "_id": "...", "subject": "...", "priority": "Critical", "category": "...", "status": "Pending",
+  "tickets": [ { "_id": "...", "subject": "...", "priority": "Critical", "category": "...", "status": "Open",
                  "author": { "authorId": "AUTH001", "name": "Priya Sharma" }, "book": { "bookId": "BK001", "title": "..." },
                  "assignedTo": null, "createdAt": "..." } ],
   "total": 6, "page": 1, "pages": 1,
@@ -195,13 +195,13 @@ The full ticket, including author details (`authorId`, `name`, `email`, `city`),
 
 ### `PATCH /admin/tickets/:id`
 
-Overrides the AI's classification and/or changes the assignee. Send at least one of these fields; any other field is rejected with 400, `status` included.
+Changes the status, overrides the AI's classification and/or changes the assignee. Send at least one of these fields; any other field is rejected with 400.
 
 ```json
-{ "priority": "High", "category": "Printing & Quality", "assignedTo": "me" }
+{ "status": "Closed", "priority": "High", "category": "Printing & Quality", "assignedTo": "me" }
 ```
 
-`assignedTo: "me"` assigns the ticket to the caller, and `null` unassigns it. Changing the category or priority sets `classificationSource` to `admin`. Returns `200 { "ticket": ... }` and sends a `ticket:changed` event to admins.
+`assignedTo: "me"` assigns the ticket to the caller, and `null` unassigns it. Assigning an `Open` ticket moves it to `In Progress` unless `status` is also sent. Changing the category or priority sets `classificationSource` to `admin`. Returns `200 { "ticket": ... }`, sends a `ticket:changed` event to admins and, when the status changed, a `ticket:updated` event to the author.
 
 ### `POST /admin/tickets/:id/notes`
 
@@ -225,7 +225,7 @@ Generates a reply draft with Gemini. It runs only when an admin asks for it, and
 { "body": "Dear Sneha, ...", "aiDrafted": true }
 ```
 
-`body` is 1–5000 characters; `aiDrafted` is optional and records whether the reply started from the AI draft. Adds the message, sets the status to **Answered**, and pushes the updated ticket to every open tab of that author.
+`body` is 1–5000 characters; `aiDrafted` is optional and records whether the reply started from the AI draft. Adds the message, sets the status to **Resolved**, and pushes the updated ticket to every open tab of that author.
 
 **201** `{ "ticket": { ... }, "delivered": 1 }`, where `delivered` is the number of the author's tabs that received it live (0 means they'll see it when they next load their tickets).
 

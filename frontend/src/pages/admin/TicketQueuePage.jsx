@@ -8,18 +8,22 @@ import { PriorityBadge, SourceTag, StatusBadge } from '../../components/ui/Badge
 import Icon from '../../components/ui/Icon';
 import StatCard from '../../components/ui/StatCard';
 import CategoryLabel from '../../components/tickets/CategoryLabel';
-import { CATEGORIES, PRIORITIES } from '../../utils/constants';
+import { ACTIVE_STATUSES, CATEGORIES, PRIORITIES } from '../../utils/constants';
 import { formatAge, formatDate, initials, isOverdue } from '../../utils/format';
 
-const DEFAULT_FILTERS = { status: 'Pending', category: '', priority: '', assigned: '', from: '', to: '' };
+// "active" (Open + In Progress) is the team's to-do list, so it is the default view.
+const DEFAULT_FILTERS = { status: 'active', category: '', priority: '', assigned: '', from: '', to: '' };
 const STATUS_TABS = [
-  ['Pending', 'Needs reply'],
-  ['Answered', 'Answered'],
-  ['all', 'All tickets'],
+  ['active', 'Needs attention'],
+  ['Open', 'Open'],
+  ['In Progress', 'In progress'],
+  ['Resolved', 'Resolved'],
+  ['Closed', 'Closed'],
+  ['all', 'All'],
 ];
 
 const toApiFilters = (f, page) => ({
-  status: f.status === 'all' ? [] : [f.status],
+  status: f.status === 'all' ? [] : f.status === 'active' ? ACTIVE_STATUSES : [f.status],
   category: f.category,
   priority: f.priority,
   assigned: f.assigned,
@@ -54,7 +58,7 @@ export default function TicketQueuePage() {
       <div className="page-header">
         <div>
           <h1>Ticket queue</h1>
-          <p>Most urgent first, then oldest. Tickets move to Answered automatically when you reply.</p>
+          <p>Most urgent first, then oldest. Assigning a ticket marks it In Progress, and replying marks it Resolved.</p>
         </div>
         <div className="page-actions">
           <LiveIndicator live={live} />
@@ -63,11 +67,11 @@ export default function TicketQueuePage() {
 
       {counts && (
         <div className="stats stats-6">
-          <StatCard icon="alert" tone="danger" label="Critical" value={counts.Critical} hint="Pending" alert={counts.Critical > 0} />
-          <StatCard icon="zap" tone="orange" label="High" value={counts.High} hint="Pending" />
-          <StatCard icon="layers" tone="warn" label="Medium" value={counts.Medium} hint="Pending" />
-          <StatCard icon="inbox" tone="blue" label="Low" value={counts.Low} hint="Pending" />
-          <StatCard icon="user" tone="ai" label="Unassigned" value={counts.unassigned} hint="Pending" />
+          <StatCard icon="alert" tone="danger" label="Critical" value={counts.Critical} hint="Unresolved" alert={counts.Critical > 0} />
+          <StatCard icon="zap" tone="orange" label="High" value={counts.High} hint="Unresolved" />
+          <StatCard icon="layers" tone="warn" label="Medium" value={counts.Medium} hint="Unresolved" />
+          <StatCard icon="inbox" tone="blue" label="Low" value={counts.Low} hint="Unresolved" />
+          <StatCard icon="user" tone="ai" label="Unassigned" value={counts.unassigned} hint="Unresolved" />
           <StatCard icon="clock" tone="danger" label="Overdue" value={overdue} hint="On this page" />
         </div>
       )}
@@ -115,7 +119,7 @@ export default function TicketQueuePage() {
         {loading && !data && <Spinner label="Loading tickets…" />}
         {data && data.tickets.length === 0 && (
           <EmptyState icon="checkCircle" title="No tickets match">
-            {filters.status === 'Pending' && !filtered ? 'The queue is clear. Nice work.' : 'Try changing or clearing the filters.'}
+            {filters.status === 'active' && !filtered ? 'The queue is clear. Nice work.' : 'Try changing or clearing the filters.'}
           </EmptyState>
         )}
 

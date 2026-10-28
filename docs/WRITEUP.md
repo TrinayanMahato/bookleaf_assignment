@@ -18,7 +18,7 @@ Two portals on one API:
 
 **Real-time with Server-Sent Events, not WebSockets.** Updates only flow from the server to the author, so SSE is the simpler and correct tool. Each open tab's response stream is held in an in-memory `Map` keyed by author ID. When an admin replies, the server looks up that author's streams and pushes the updated ticket. Browsers reconnect on their own and refetch on reconnect, so a restart loses nothing.
 
-**Two automatic statuses instead of four.** The brief lists Open / In Progress / Resolved / Closed. I use **Pending** (set when an author raises a query) and **Answered** (set automatically when an admin replies). A ticket is really either waiting on the team or not, so letting the system set the status keeps the queue accurate without admins updating it by hand. "In progress" is covered by assignment.
+**Statuses that mostly set themselves.** Tickets use the brief's Open / In Progress / Resolved / Closed. Assigning a ticket moves it to In Progress and replying moves it to Resolved, so the queue stays accurate even when admins don't update it by hand; they can still set any status, e.g. to close or reopen a ticket.
 
 ## AI integration
 - **Model:** Gemini 3.5 Flash. Both tasks are short and well defined, so a fast, low-cost model fits. Its native JSON-schema output makes classification reliable.

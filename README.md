@@ -90,26 +90,28 @@ Notes on the free tier:
 ### Author portal
 - **My Books:** for every title, its ISBN, genre, publication date, status, MRP and copies sold, plus royalty earned, paid and pending. Books still in production say so instead of showing empty figures.
 - **Raise a query:** pick a book or *General / Account Level*, then add a subject, a description, and up to 3 optional attachments (JPG, PNG, WEBP or PDF, 2 MB each).
-- **My Tickets:** every ticket with its status and full conversation. When an admin replies, the ticket updates in place and a notification appears.
+- **My Tickets:** every ticket with its status and full conversation, with tabs per status. When an admin replies or changes the status, the ticket updates in place and a notification appears.
 
 ### Admin support desk
-- **Ticket queue:** sorted by priority, then oldest first. Filter by status, category, priority, assignee and date range. Counts of pending tickets by priority, unassigned tickets, and an overdue flag based on how long each priority should wait.
+- **Ticket queue:** sorted by priority, then oldest first. Filter by status, category, priority, assignee and date range. Defaults to *Needs attention* (Open + In Progress). Counts of unresolved tickets by priority, unassigned tickets, and an overdue flag based on how long each priority should wait.
 - **AI classification:** every ticket gets one of the 6 categories and a priority when it is created, with a one-line reason. Admins can override both, and the override is recorded.
 - **AI-drafted reply:** "Generate AI draft" writes a personalised reply from the ticket, the author's real book and royalty data, and the matching Knowledge Base section. The admin edits it before sending.
 - **Internal notes:** visible to staff only.
-- **Assign to me / unassign.**
+- **Ticket management:** change the status (Open, In Progress, Resolved, Closed), assign to me / unassign.
 - **Live queue:** new tickets and other admins' changes appear without a refresh.
 - **AI usage:** every Gemini request with its model, result, latency and token usage, plus totals per action.
 
 ### Ticket status
-Status is never set by hand:
+The four statuses from the brief. The common transitions happen automatically, so the queue stays accurate even if nobody updates it by hand, and admins can set any status from the ticket page:
 
 | Event | Status |
 |---|---|
-| Author raises a query | `Pending` |
-| An admin sends a reply | `Answered` |
+| Author raises a query | `Open` |
+| An admin assigns an Open ticket to themselves | `In Progress` |
+| An admin sends a reply | `Resolved` |
+| An admin closes it (nothing more to do) | `Closed` |
 
-> **Deviation from the brief:** the brief lists Open / In Progress / Resolved / Closed. A ticket here can only be waiting on the team or answered, so two statuses that change automatically keep the queue accurate without admins having to update anything. "In progress" is covered by the assignee field, and the default *Pending* filter is the team's to-do list.
+Admins can also reopen a Resolved or Closed ticket by setting it back to Open or In Progress. Every status change is pushed to the author live.
 
 ---
 
@@ -126,9 +128,10 @@ Where the brief left a decision open, this is what I assumed:
 **Tickets**
 - A ticket is about one of the author's own books or is *General / Account Level*. Authors can't raise tickets about other authors' books.
 - Attachments are optional: up to 3 files, JPG, PNG, WEBP or PDF, 2 MB each.
-- Status is fully automatic: **Pending** on creation and **Answered** after an admin reply (see above). Admins can't set it by hand.
+- Replying sets **Resolved** rather than Closed, because the author may still follow up; closing is a deliberate admin action.
+- Tickets created before the four statuses existed (Pending / Answered) are converted on server start: Answered becomes Resolved, and Pending becomes In Progress if assigned, otherwise Open.
 - Admins can assign a ticket only to themselves ("Assign to me"), which is all the brief asks for.
-- A ticket counts as overdue when it is still Pending after 24 h (Critical), 48 h (High), 72 h (Medium) or 120 h (Low). These thresholds are my assumption, based on the Knowledge Base's 24–48 h escalation timelines.
+- A ticket counts as overdue when it is still Open or In Progress after 24 h (Critical), 48 h (High), 72 h (Medium) or 120 h (Low). These thresholds are my assumption, based on the Knowledge Base's 24–48 h escalation timelines.
 - Authors can't reply inside an existing ticket; a follow-up is a new ticket.
 
 **AI**

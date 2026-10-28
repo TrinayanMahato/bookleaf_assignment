@@ -177,8 +177,10 @@ textarea { resize: vertical; min-height: 140px; line-height: 1.6; }
 /* Badges & tags */
 .badge { display: inline-flex; align-items: center; gap: 0.38rem; padding: 0.12rem 0.55rem; border-radius: 999px; border: 1px solid transparent; font-size: 0.75rem; font-weight: 600; line-height: 1.5; white-space: nowrap; }
 .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.status-pending { background: var(--warn-50); color: var(--warn-700); border-color: var(--warn-200); }
-.status-answered { background: var(--brand-50); color: var(--brand-700); border-color: var(--brand-100); }
+.status-open { background: var(--warn-50); color: var(--warn-700); border-color: var(--warn-200); }
+.status-in-progress { background: var(--blue-50); color: var(--blue-700); border-color: var(--blue-200); }
+.status-resolved { background: var(--brand-50); color: var(--brand-700); border-color: var(--brand-100); }
+.status-closed { background: var(--surface-3); color: var(--text-2); border-color: var(--border); }
 .priority-critical { background: var(--danger-50); color: var(--danger-700); border-color: var(--danger-200); }
 .priority-high { background: var(--orange-50); color: var(--orange-700); border-color: var(--orange-200); }
 .priority-medium { background: var(--blue-50); color: var(--blue-700); border-color: var(--blue-200); }

@@ -9,9 +9,11 @@ import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import MessageThread from '../../components/tickets/MessageThread';
 import AttachmentList from '../../components/tickets/AttachmentList';
+import { ACTIVE_STATUSES, STATUSES } from '../../utils/constants';
 import { formatDate, formatDateTime } from '../../utils/format';
 
-const FILTERS = ['All', 'Pending', 'Answered'];
+const FILTERS = ['All', ...STATUSES];
+const STATUS_ICONS = { Open: 'clock', 'In Progress': 'hourglass', Resolved: 'checkCircle', Closed: 'lock' };
 
 export default function MyTicketsPage() {
   const { user } = useAuth();
@@ -21,7 +23,7 @@ export default function MyTicketsPage() {
   const [toast, setToast] = useState(null);
   const [freshIds, setFreshIds] = useState(new Set()); // tickets updated live since the page opened
 
-  // Live updates: an admin reply (which also flips the status to Answered) replaces the ticket in place.
+  // Live updates: an admin reply or status change replaces the ticket in place.
   const live = useEventStream(
     {
       'ticket:updated': (updated) => {
@@ -44,7 +46,7 @@ export default function MyTicketsPage() {
   }, [toast]);
 
   const tickets = data?.tickets ?? [];
-  const counts = { All: tickets.length, Pending: 0, Answered: 0 };
+  const counts = Object.fromEntries([['All', tickets.length], ...STATUSES.map((s) => [s, 0])]);
   tickets.forEach((t) => (counts[t.status] += 1));
   const shown = filter === 'All' ? tickets : tickets.filter((t) => t.status === filter);
 
@@ -53,7 +55,7 @@ export default function MyTicketsPage() {
       <div className="page-header">
         <div>
           <h1>My Tickets</h1>
-          <p>Track your support queries. Replies from our team appear here instantly.</p>
+          <p>Track your support queries. Replies and status changes from our team appear here instantly.</p>
         </div>
         <div className="page-actions">
           <Link to="/author/tickets/new" className="btn btn-primary"><Icon name="messagePlus" size={16} /> New query</Link>
@@ -97,12 +99,12 @@ export default function MyTicketsPage() {
         {shown.map((t) => {
           const replies = t.messages.filter((m) => m.senderModel === 'Admin').length;
           const fresh = freshIds.has(t._id);
-          const answered = t.status === 'Answered';
+          const active = ACTIVE_STATUSES.includes(t.status);
           return (
             <details key={t._id} className={`card ticket-card ${fresh ? 'fresh' : ''}`} open={fresh || undefined}>
               <summary>
-                <span className={`ticket-icon ${answered ? 'answered' : 'pending'}`} aria-hidden="true">
-                  <Icon name={answered ? 'checkCircle' : 'clock'} size={19} />
+                <span className={`ticket-icon ${active ? 'pending' : 'answered'}`} aria-hidden="true">
+                  <Icon name={STATUS_ICONS[t.status]} size={19} />
                 </span>
                 <div className="ticket-main">
                   <h3>
@@ -126,7 +128,7 @@ export default function MyTicketsPage() {
               <div className="ticket-body">
                 <AttachmentList ticketId={t._id} attachments={t.attachments} />
                 <MessageThread ticket={t} viewer="author" />
-                {!replies && (
+                {!replies && active && (
                   <div className="awaiting">
                     <Icon name="hourglass" size={16} />
                     Our team is looking into this. We usually reply within 48 hours, and you'll see it here as soon as we do.
@@ -139,7 +141,7 @@ export default function MyTicketsPage() {
       </div>
 
       {toast && (
-        <Toast title="New reply from BookLeaf" onClose={() => setToast(null)}>
+        <Toast title="Update from BookLeaf" onClose={() => setToast(null)}>
           {toast}
         </Toast>
       )}

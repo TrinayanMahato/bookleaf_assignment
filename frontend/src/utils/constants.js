@@ -1,6 +1,7 @@
 // Mirrors the backend enums in models/Ticket.js.
-// Set automatically by the backend: Pending on creation, Answered after an admin reply.
-export const STATUSES = ['Pending', 'Answered'];
+// Mirrors models/Ticket.js: Open on creation, In Progress when assigned, Resolved after a reply; admins can set any.
+export const STATUSES = ['Open', 'In Progress', 'Resolved', 'Closed'];
+export const ACTIVE_STATUSES = ['Open', 'In Progress']; // still waiting on the team
 export const PRIORITIES = ['Critical', 'High', 'Medium', 'Low'];
 export const CATEGORIES = [
   'Royalty & Payments',

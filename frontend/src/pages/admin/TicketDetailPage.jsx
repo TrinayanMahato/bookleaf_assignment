@@ -11,7 +11,7 @@ import Icon from '../../components/ui/Icon';
 import CategoryLabel from '../../components/tickets/CategoryLabel';
 import MessageThread from '../../components/tickets/MessageThread';
 import AttachmentList from '../../components/tickets/AttachmentList';
-import { CATEGORIES, PRIORITIES } from '../../utils/constants';
+import { CATEGORIES, PRIORITIES, STATUSES } from '../../utils/constants';
 import { formatAge, formatDate, formatDateTime, formatMoney, initials } from '../../utils/format';
 
 function ReplyComposer({ ticket, onSent }) {
@@ -202,11 +202,11 @@ export default function TicketDetailPage() {
             <div className="card-title"><h3><Icon name="layers" size={15} /> Properties</h3></div>
             <div className="props">
               <div className="prop">
-                <span className="prop-label">Status</span>
-                <span className="prop-value">
-                  <StatusBadge status={ticket.status} />
-                  <span className="muted small">{ticket.status === 'Pending' ? 'Changes to Answered when you reply' : 'Set automatically on reply'}</span>
-                </span>
+                <label className="prop-label" htmlFor="d-status">Status</label>
+                <select id="d-status" value={ticket.status} disabled={saving} onChange={(e) => change({ status: e.target.value })}>
+                  {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                </select>
+                <span className="muted small">Assigning sets In Progress and replying sets Resolved automatically.</span>
               </div>
               <div className="prop">
                 <label className="prop-label" htmlFor="d-priority">Priority</label>

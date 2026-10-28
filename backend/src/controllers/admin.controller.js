@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { z } from 'zod';
-import Ticket, { STATUSES, CATEGORIES, PRIORITIES } from '../models/Ticket.js';
+import Ticket, { STATUSES, ACTIVE_STATUSES, CATEGORIES, PRIORITIES } from '../models/Ticket.js';
 import { generateDraft, AIUnavailableError } from '../services/ai.service.js';
 import { notifyAuthor, notifyAdmins } from '../services/sse.service.js';
 
@@ -38,11 +38,12 @@ const queueQuerySchema = z.object({
 
 const updateTicketSchema = z
   .object({
+    status: z.enum(STATUSES).optional(),
     category: z.enum(CATEGORIES).optional(),
     priority: z.enum(PRIORITIES).optional(),
     assignedTo: z.enum(['me']).nullable().optional(), // "me" assigns to the caller, null unassigns
   })
-  .strict('Only category, priority and assignedTo can be changed; status updates automatically')
+  .strict('Only status, category, priority and assignedTo can be changed')
   .refine((v) => Object.keys(v).length > 0, 'Provide at least one field to update');
 
 const noteSchema = z.object({
@@ -94,10 +95,10 @@ export const listTickets = async (req, res) => {
         .limit(limit),
       Ticket.countDocuments(filter),
       Ticket.aggregate([
-        { $match: { status: 'Pending' } },
+        { $match: { status: { $in: ACTIVE_STATUSES } } },
         { $group: { _id: '$priority', count: { $sum: 1 } } },
       ]),
-      Ticket.countDocuments({ status: 'Pending', assignedTo: null }),
+      Ticket.countDocuments({ status: { $in: ACTIVE_STATUSES }, assignedTo: null }),
     ]);
 
     const counts = { unassigned, ...Object.fromEntries(PRIORITIES.map((p) => [p, 0])) };
@@ -148,8 +149,7 @@ export const updateTicket = async (req, res) => {
       return res.status(404).json({ error: 'Ticket not found' });
     }
 
-    // Status is not editable here: it only changes automatically (see createTicket and sendReply).
-    const { category, priority, assignedTo } = body.data;
+    const { status, category, priority, assignedTo } = body.data;
     if (category) ticket.category = category;
     if (priority) ticket.priority = priority;
     // An admin override wins over the AI and is recorded as such.
@@ -158,9 +158,15 @@ export const updateTicket = async (req, res) => {
       ticket.classificationReason = 'Set manually by an admin';
     }
     if (assignedTo !== undefined) ticket.assignedTo = assignedTo === 'me' ? req.user.id : null;
+    // Picking up an Open ticket starts work on it, unless the admin also chose a status in this request.
+    if (status) ticket.status = status;
+    else if (assignedTo === 'me' && ticket.status === 'Open') ticket.status = 'In Progress';
+    const statusChanged = ticket.isModified('status');
     await ticket.save();
 
     notifyAdmins('ticket:changed', { ticketId: ticket._id });
+    // The author sees status changes live, the same way they see replies.
+    if (statusChanged) notifyAuthor(ticket.author, 'ticket:updated', await findAuthorView(ticket._id));
 
     const updated = await withTicketRelations(
       Ticket.findById(ticket._id).select('+internalNotes').populate('internalNotes.admin', 'name')
@@ -252,7 +258,7 @@ export const sendReply = async (req, res) => {
       body: body.data.body,
       aiDrafted: body.data.aiDrafted ?? false,
     });
-    ticket.status = 'Answered'; // an admin reply always answers the ticket
+    ticket.status = 'Resolved'; // a reply resolves the ticket; an admin can reopen or close it from the status field
     await ticket.save();
 
     const authorView = await findAuthorView(ticket._id);
