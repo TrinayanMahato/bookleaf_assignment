@@ -4,21 +4,25 @@ import { getMyTickets } from '../../api/author.api';
 import useAuth from '../../hooks/useAuth';
 import useAsync from '../../hooks/useAsync';
 import useEventStream from '../../hooks/useEventStream';
-import { EmptyState, ErrorBanner, Notice, Spinner } from '../../components/ui/Feedback';
+import { EmptyState, ErrorBanner, LiveIndicator, Notice, Spinner, Toast } from '../../components/ui/Feedback';
 import { StatusBadge } from '../../components/ui/Badge';
+import Icon from '../../components/ui/Icon';
 import MessageThread from '../../components/tickets/MessageThread';
 import AttachmentList from '../../components/tickets/AttachmentList';
 import { formatDate, formatDateTime } from '../../utils/format';
+
+const FILTERS = ['All', 'Pending', 'Answered'];
 
 export default function MyTicketsPage() {
   const { user } = useAuth();
   const location = useLocation();
   const { data, error, loading, reload, setData } = useAsync(() => getMyTickets(user.authorId), [user.authorId]);
+  const [filter, setFilter] = useState('All');
   const [toast, setToast] = useState(null);
   const [freshIds, setFreshIds] = useState(new Set()); // tickets updated live since the page opened
 
   // Live updates: an admin reply (which also flips the status to Answered) replaces the ticket in place.
-  useEventStream(
+  const live = useEventStream(
     {
       'ticket:updated': (updated) => {
         setData((d) => {
@@ -27,7 +31,7 @@ export default function MyTicketsPage() {
           return { ...d, tickets: [updated, ...others] };
         });
         setFreshIds((s) => new Set(s).add(updated._id));
-        setToast(`Update on "${updated.subject}"`);
+        setToast(updated.subject);
       },
     },
     () => reload({ silent: true }), // after a reconnect, catch up on anything missed
@@ -40,56 +44,105 @@ export default function MyTicketsPage() {
   }, [toast]);
 
   const tickets = data?.tickets ?? [];
+  const counts = { All: tickets.length, Pending: 0, Answered: 0 };
+  tickets.forEach((t) => (counts[t.status] += 1));
+  const shown = filter === 'All' ? tickets : tickets.filter((t) => t.status === filter);
 
   return (
     <>
       <div className="page-header">
         <div>
           <h1>My Tickets</h1>
-          <p>Replies from our team appear here instantly.</p>
+          <p>Track your support queries. Replies from our team appear here instantly.</p>
         </div>
-        <Link to="/author/tickets/new" className="btn btn-primary">New query</Link>
+        <div className="page-actions">
+          <Link to="/author/tickets/new" className="btn btn-primary"><Icon name="messagePlus" size={16} /> New query</Link>
+        </div>
       </div>
 
-      {location.state?.created && <Notice tone="success">Your query "{location.state.created}" was submitted. We'll be in touch soon.</Notice>}
+      {location.state?.created && (
+        <Notice tone="success">
+          <strong>Query submitted.</strong> "{location.state.created}" is with our team. You'll see the reply here.
+        </Notice>
+      )}
       <ErrorBanner error={error} onRetry={reload} />
       {loading && !data && <Spinner label="Loading your tickets…" />}
 
       {data && tickets.length === 0 && (
-        <EmptyState title="No support queries yet" action={<Link to="/author/tickets/new" className="btn btn-primary">Raise a query</Link>}>
+        <EmptyState
+          icon="message"
+          title="No support queries yet"
+          action={<Link to="/author/tickets/new" className="btn btn-primary"><Icon name="messagePlus" size={16} /> Raise a query</Link>}
+        >
           Questions about royalties, ISBNs, printing or your book's status? We're here to help.
         </EmptyState>
       )}
 
+      {tickets.length > 0 && (
+        <div className="list-toolbar">
+          <div className="tabs" role="tablist">
+            {FILTERS.map((f) => (
+              <button key={f} type="button" role="tab" aria-selected={filter === f} className={`tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+                {f} <span className="tab-count">{counts[f]}</span>
+              </button>
+            ))}
+          </div>
+          <LiveIndicator live={live} />
+        </div>
+      )}
+
+      {tickets.length > 0 && shown.length === 0 && <EmptyState icon="inbox" title={`No ${filter.toLowerCase()} tickets`} />}
+
       <div className="ticket-list">
-        {tickets.map((t) => {
+        {shown.map((t) => {
           const replies = t.messages.filter((m) => m.senderModel === 'Admin').length;
+          const fresh = freshIds.has(t._id);
+          const answered = t.status === 'Answered';
           return (
-            <details key={t._id} className="card ticket-card" open={freshIds.has(t._id) || undefined}>
+            <details key={t._id} className={`card ticket-card ${fresh ? 'fresh' : ''}`} open={fresh || undefined}>
               <summary>
-                <div className="ticket-summary">
-                  <div>
-                    <h3>
-                      {freshIds.has(t._id) && <span className="unread-dot" aria-label="New update" />} {t.subject}
-                    </h3>
-                    <div className="ticket-sub">
-                      {t.book ? t.book.title : 'General / Account Level'} · opened {formatDate(t.createdAt)} · last update {formatDateTime(t.updatedAt)}
-                    </div>
-                  </div>
-                  <div className="ticket-badges">
-                    <span className="muted small">{replies ? `${replies} repl${replies > 1 ? 'ies' : 'y'}` : 'Awaiting reply'}</span>
-                    <StatusBadge status={t.status} />
+                <span className={`ticket-icon ${answered ? 'answered' : 'pending'}`} aria-hidden="true">
+                  <Icon name={answered ? 'checkCircle' : 'clock'} size={19} />
+                </span>
+                <div className="ticket-main">
+                  <h3>
+                    {fresh && <span className="unread-dot" aria-label="New update" />}
+                    <span>{t.subject}</span>
+                  </h3>
+                  <div className="ticket-sub">
+                    <span>{t.book ? t.book.title : 'General / Account Level'}</span>
+                    <span className="sep">·</span>
+                    <span>Opened {formatDate(t.createdAt)}</span>
+                    <span className="sep">·</span>
+                    <span>Updated {formatDateTime(t.updatedAt)}</span>
                   </div>
                 </div>
+                <div className="ticket-right">
+                  <span className="reply-count" title={`${replies} repl${replies === 1 ? 'y' : 'ies'}`}><Icon name="message" size={14} />{replies}</span>
+                  <StatusBadge status={t.status} />
+                  <Icon name="chevronDown" size={18} className="chevron" />
+                </div>
               </summary>
-              <AttachmentList ticketId={t._id} attachments={t.attachments} />
-              <MessageThread ticket={t} viewer="author" />
+              <div className="ticket-body">
+                <AttachmentList ticketId={t._id} attachments={t.attachments} />
+                <MessageThread ticket={t} viewer="author" />
+                {!replies && (
+                  <div className="awaiting">
+                    <Icon name="hourglass" size={16} />
+                    Our team is looking into this. We usually reply within 48 hours, and you'll see it here as soon as we do.
+                  </div>
+                )}
+              </div>
             </details>
           );
         })}
       </div>
 
-      {toast && <div className="toast" role="status">🔔 {toast}</div>}
+      {toast && (
+        <Toast title="New reply from BookLeaf" onClose={() => setToast(null)}>
+          {toast}
+        </Toast>
+      )}
     </>
   );
 }

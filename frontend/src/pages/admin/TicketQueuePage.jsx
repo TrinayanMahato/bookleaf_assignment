@@ -3,12 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { listTickets } from '../../api/admin.api';
 import useAsync from '../../hooks/useAsync';
 import useEventStream from '../../hooks/useEventStream';
-import { EmptyState, ErrorBanner, Spinner } from '../../components/ui/Feedback';
-import { PriorityBadge, StatusBadge, Tag } from '../../components/ui/Badge';
-import { CATEGORIES, PRIORITIES, STATUSES } from '../../utils/constants';
-import { formatAge, formatDate, isOverdue } from '../../utils/format';
+import { EmptyState, ErrorBanner, LiveIndicator, Spinner } from '../../components/ui/Feedback';
+import { PriorityBadge, SourceTag, StatusBadge } from '../../components/ui/Badge';
+import Icon from '../../components/ui/Icon';
+import StatCard from '../../components/ui/StatCard';
+import CategoryLabel from '../../components/tickets/CategoryLabel';
+import { CATEGORIES, PRIORITIES } from '../../utils/constants';
+import { formatAge, formatDate, initials, isOverdue } from '../../utils/format';
 
 const DEFAULT_FILTERS = { status: 'Pending', category: '', priority: '', assigned: '', from: '', to: '' };
+const STATUS_TABS = [
+  ['Pending', 'Needs reply'],
+  ['Answered', 'Answered'],
+  ['all', 'All tickets'],
+];
 
 const toApiFilters = (f, page) => ({
   status: f.status === 'all' ? [] : [f.status],
@@ -27,15 +35,17 @@ export default function TicketQueuePage() {
   const { data, error, loading, reload } = useAsync(() => listTickets(toApiFilters(filters, page)), [filters, page]);
 
   // New tickets, replies and status changes re-sort the queue live.
-  useEventStream({
+  const live = useEventStream({
     'ticket:created': () => reload({ silent: true }),
     'ticket:changed': () => reload({ silent: true }),
   }, () => reload({ silent: true }));
 
-  const setFilter = (field) => (e) => {
-    setFilters((f) => ({ ...f, [field]: e.target.value }));
+  const setFilter = (field, value) => {
+    setFilters((f) => ({ ...f, [field]: value }));
     setPage(1);
   };
+  const onFilter = (field) => (e) => setFilter(field, e.target.value);
+  const filtered = Object.keys(DEFAULT_FILTERS).some((k) => k !== 'status' && filters[k] !== DEFAULT_FILTERS[k]);
   const counts = data?.counts;
   const overdue = data?.tickets.filter(isOverdue).length ?? 0;
 
@@ -44,113 +54,149 @@ export default function TicketQueuePage() {
       <div className="page-header">
         <div>
           <h1>Ticket queue</h1>
-          <p>Most urgent first, then oldest first. Tickets move to Answered automatically when you reply.</p>
+          <p>Most urgent first, then oldest. Tickets move to Answered automatically when you reply.</p>
+        </div>
+        <div className="page-actions">
+          <LiveIndicator live={live} />
         </div>
       </div>
 
       {counts && (
-        <div className="stats">
-          <div className="stat stat-critical"><div className="stat-label">Critical pending</div><div className="stat-value">{counts.Critical}</div></div>
-          <div className="stat stat-warn"><div className="stat-label">High pending</div><div className="stat-value">{counts.High}</div></div>
-          <div className="stat"><div className="stat-label">Medium pending</div><div className="stat-value">{counts.Medium}</div></div>
-          <div className="stat"><div className="stat-label">Low pending</div><div className="stat-value">{counts.Low}</div></div>
-          <div className="stat"><div className="stat-label">Pending unassigned</div><div className="stat-value">{counts.unassigned}</div></div>
-          <div className="stat stat-critical"><div className="stat-label">Overdue (this page)</div><div className="stat-value">{overdue}</div></div>
+        <div className="stats stats-6">
+          <StatCard icon="alert" tone="danger" label="Critical" value={counts.Critical} hint="Pending" alert={counts.Critical > 0} />
+          <StatCard icon="zap" tone="orange" label="High" value={counts.High} hint="Pending" />
+          <StatCard icon="layers" tone="warn" label="Medium" value={counts.Medium} hint="Pending" />
+          <StatCard icon="inbox" tone="blue" label="Low" value={counts.Low} hint="Pending" />
+          <StatCard icon="user" tone="ai" label="Unassigned" value={counts.unassigned} hint="Pending" />
+          <StatCard icon="clock" tone="danger" label="Overdue" value={overdue} hint="On this page" />
         </div>
       )}
 
-      <div className="card filters">
-        <div className="field">
-          <label htmlFor="f-status">Status</label>
-          <select id="f-status" value={filters.status} onChange={setFilter('status')}>
-            {STATUSES.map((s) => <option key={s} value={s}>{s === 'Pending' ? 'Pending (needs a reply)' : s}</option>)}
-            <option value="all">All statuses</option>
-          </select>
+      <div className="card card-flush">
+        <div className="card-header">
+          <div className="tabs" role="tablist">
+            {STATUS_TABS.map(([value, label]) => (
+              <button key={value} type="button" role="tab" aria-selected={filters.status === value} className={`tab ${filters.status === value ? 'active' : ''}`} onClick={() => setFilter('status', value)}>
+                {label}
+                {filters.status === value && data && <span className="tab-count">{data.total}</span>}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="field">
-          <label htmlFor="f-category">Category</label>
-          <select id="f-category" value={filters.category} onChange={setFilter('category')}>
+
+        <div className="toolbar">
+          <select aria-label="Category" value={filters.category} onChange={onFilter('category')}>
             <option value="">All categories</option>
             {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-        </div>
-        <div className="field">
-          <label htmlFor="f-priority">Priority</label>
-          <select id="f-priority" value={filters.priority} onChange={setFilter('priority')}>
+          <select aria-label="Priority" value={filters.priority} onChange={onFilter('priority')}>
             <option value="">All priorities</option>
             {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
-        </div>
-        <div className="field">
-          <label htmlFor="f-assigned">Assigned</label>
-          <select id="f-assigned" value={filters.assigned} onChange={setFilter('assigned')}>
+          <select aria-label="Assigned" value={filters.assigned} onChange={onFilter('assigned')}>
             <option value="">Anyone</option>
             <option value="me">Assigned to me</option>
             <option value="unassigned">Unassigned</option>
           </select>
+          <span className="date-range">
+            <input aria-label="From date" type="date" value={filters.from} onChange={onFilter('from')} />
+            to
+            <input aria-label="To date" type="date" value={filters.to} onChange={onFilter('to')} />
+          </span>
+          <span className="toolbar-spacer" />
+          {filtered && (
+            <button type="button" className="btn btn-ghost btn-small" onClick={() => { setFilters({ ...DEFAULT_FILTERS, status: filters.status }); setPage(1); }}>
+              <Icon name="x" size={14} /> Clear filters
+            </button>
+          )}
         </div>
-        <div className="field">
-          <label htmlFor="f-from">From</label>
-          <input id="f-from" type="date" value={filters.from} onChange={setFilter('from')} />
-        </div>
-        <div className="field">
-          <label htmlFor="f-to">To</label>
-          <input id="f-to" type="date" value={filters.to} onChange={setFilter('to')} />
-        </div>
-        <button type="button" className="btn" onClick={() => { setFilters(DEFAULT_FILTERS); setPage(1); }}>Reset</button>
-      </div>
 
-      <ErrorBanner error={error} onRetry={reload} />
-      {loading && !data && <Spinner label="Loading tickets…" />}
-      {data && data.tickets.length === 0 && <EmptyState title="No tickets match these filters">Nothing waiting. 🎉</EmptyState>}
+        <ErrorBanner error={error} onRetry={reload} />
+        {loading && !data && <Spinner label="Loading tickets…" />}
+        {data && data.tickets.length === 0 && (
+          <EmptyState icon="checkCircle" title="No tickets match">
+            {filters.status === 'Pending' && !filtered ? 'The queue is clear. Nice work.' : 'Try changing or clearing the filters.'}
+          </EmptyState>
+        )}
 
-      {data?.tickets.length > 0 && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Priority</th>
-                <th>Ticket</th>
-                <th>Category</th>
-                <th>Author / Book</th>
-                <th>Status</th>
-                <th>Age</th>
-                <th>Assigned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.tickets.map((t) => (
-                <tr key={t._id} className={t.priority === 'Critical' ? 'row-critical' : ''} onClick={() => navigate(`/admin/tickets/${t._id}`)}>
-                  <td><PriorityBadge priority={t.priority} /></td>
-                  <td>
-                    <strong>{t.subject}</strong>
-                    <div className="muted small">Opened {formatDate(t.createdAt)}</div>
-                  </td>
-                  <td>
-                    {t.category}
-                    <div>{t.classificationSource === 'ai' ? <Tag tone="ai">AI</Tag> : t.classificationSource === 'admin' ? <Tag>Manual</Tag> : <Tag>Rules</Tag>}</div>
-                  </td>
-                  <td>
-                    {t.author?.name}
-                    <div className="muted small">{t.book?.title ?? 'General / Account'}</div>
-                  </td>
-                  <td><StatusBadge status={t.status} /></td>
-                  <td className={isOverdue(t) ? 'age-overdue' : ''} title={isOverdue(t) ? 'Overdue for its priority' : ''}>{formatAge(t.createdAt)}</td>
-                  <td>{t.assignedTo?.name ?? <Tag tone="danger">Unassigned</Tag>}</td>
+        {data?.tickets.length > 0 && (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Priority</th>
+                  <th>Ticket</th>
+                  <th>Category</th>
+                  <th>Author</th>
+                  <th>Status · Age</th>
+                  <th>Assignee</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {data.tickets.map((t) => {
+                  const late = isOverdue(t);
+                  return (
+                    <tr key={t._id} className={t.priority === 'Critical' ? 'row-critical' : ''} onClick={() => navigate(`/admin/tickets/${t._id}`)}>
+                      <td><PriorityBadge priority={t.priority} /></td>
+                      <td>
+                        <span className="cell-title" title={t.subject}>{t.subject}</span>
+                        <span className="cell-sub">{t.book?.title ?? 'General / Account'} · {formatDate(t.createdAt)}</span>
+                      </td>
+                      <td>
+                        <CategoryLabel category={t.category} />
+                        <span className="cell-sub"><SourceTag source={t.classificationSource} /></span>
+                      </td>
+                      <td>
+                        <span className="person">
+                          <span className="avatar avatar-sm" aria-hidden="true">{initials(t.author?.name)}</span>
+                          <span className="person-text">
+                            <strong>{t.author?.name}</strong>
+                            <span>{t.author?.authorId}</span>
+                          </span>
+                        </span>
+                      </td>
+                      <td>
+                        <StatusBadge status={t.status} />
+                        <span className="cell-sub">
+                          <span className={`age ${late ? 'age-overdue' : ''}`} title={late ? 'Overdue for its priority' : 'Time since opened'}>
+                            <Icon name={late ? 'alert' : 'clock'} size={13} />{formatAge(t.createdAt)}
+                          </span>
+                        </span>
+                      </td>
+                      <td>
+                        {t.assignedTo ? (
+                          <span className="person">
+                            <span className="avatar avatar-sm avatar-staff" aria-hidden="true">{initials(t.assignedTo.name)}</span>
+                            <span className="person-text"><strong>{t.assignedTo.name}</strong></span>
+                          </span>
+                        ) : (
+                          <span className="unassigned">Unassigned</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-      {data && data.pages > 1 && (
-        <div className="pagination">
-          <button type="button" className="btn btn-small" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>← Previous</button>
-          <span className="muted small">Page {data.page} of {data.pages} · {data.total} tickets</span>
-          <button type="button" className="btn btn-small" disabled={page >= data.pages} onClick={() => setPage((p) => p + 1)}>Next →</button>
-        </div>
-      )}
+        {data && data.total > 0 && (
+          <div className="table-foot">
+            <span>Page {data.page} of {Math.max(1, data.pages)} · {data.total} ticket{data.total === 1 ? '' : 's'}</span>
+            {data.pages > 1 && (
+              <div className="page-btns">
+                <button type="button" className="btn btn-small" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                  <Icon name="arrowLeft" size={14} /> Previous
+                </button>
+                <button type="button" className="btn btn-small" disabled={page >= data.pages} onClick={() => setPage((p) => p + 1)}>
+                  Next <Icon name="arrowRight" size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </>
   );
 }

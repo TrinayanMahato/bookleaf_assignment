@@ -24,3 +24,13 @@ export const isOverdue = (ticket) =>
   (Date.now() - new Date(ticket.createdAt)) / 3_600_000 > OVERDUE_HOURS[ticket.priority];
 
 export const formatFileSize = (bytes) => (bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
+
+// "Sneha Kulkarni" → "SK"
+export const initials = (name = '') =>
+  name
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
