@@ -7,6 +7,12 @@ A support portal for BookLeaf Publishing with two sides:
 
 **Stack:** React 19 + Vite · Node 22 + Express 5 · MongoDB (Mongoose) · Zod · JWT + bcrypt · Multer · Server-Sent Events · Google Gemini
 
+**Live demo**
+- Frontend: https://bookleaf-web-r33q.onrender.com
+- Backend API: https://bookleaf-api-9ubd.onrender.com (health check: `/api/health`)
+
+Demo logins are listed [below](#demo-accounts). The free tier sleeps when idle, so the first request can take 30–50 s.
+
 API reference: [docs/API.md](docs/API.md)
 
 ---
@@ -66,8 +72,8 @@ Keys and secrets live only in `.env`, which is gitignored. The frontend never se
 3. **Render:** *New → Blueprint*, connect this GitHub repo, and fill in the values it asks for:
    - `MONGODB_URI`: the Atlas URI
    - `GEMINI_API_KEY`: your Gemini key
-   - `CORS_ORIGIN`: `https://bookleaf-web.onrender.com` (the frontend's URL)
-   - `VITE_API_URL`: `https://bookleaf-api.onrender.com` (the API's URL)
+   - `CORS_ORIGIN`: the frontend's URL, e.g. `https://bookleaf-web.onrender.com`
+   - `VITE_API_URL`: the API's URL, e.g. `https://bookleaf-api.onrender.com`
 
    `JWT_SECRET` is generated automatically. If Render gives a service a different URL, update `CORS_ORIGIN` / `VITE_API_URL` to match and redeploy (the frontend reads `VITE_API_URL` at build time).
 4. **Check it:** open `https://bookleaf-api.onrender.com/api/health`, then log in on the frontend with the demo accounts.
