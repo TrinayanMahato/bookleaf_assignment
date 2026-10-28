@@ -13,7 +13,7 @@ A support portal for BookLeaf Publishing with two sides:
 
 Demo logins are listed [below](#demo-accounts). The free tier sleeps when idle, so the first request can take 30–50 s.
 
-API reference: [docs/API.md](docs/API.md)
+API reference: [docs/API.md](docs/API.md) · Write-up: [docs/WRITEUP.md](docs/WRITEUP.md)
 
 ---
 
