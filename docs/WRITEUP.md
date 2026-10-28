@@ -2,6 +2,8 @@
 
 **Live:** https://bookleaf-web-r33q.onrender.com · **API:** https://bookleaf-api-9ubd.onrender.com · **Stack:** React 19 + Vite, Node/Express 5, MongoDB, Zod, JWT + bcrypt, SSE, Google Gemini
 
+**Setup** and the full **assumptions list** are in the README ([Quick start](../README.md#quick-start), [Assumptions & notes](../README.md#assumptions--notes)). Demo logins: author `sneha.kulkarni@email.com` / `author123`, admin `admin@bookleaf.com` / `admin123`.
+
 ## What I built
 Two portals on one API:
 - **Authors** see their books and royalties (earned / paid / pending), raise a query about a specific book or their account, with optional attachments, and see the team's replies arrive live.

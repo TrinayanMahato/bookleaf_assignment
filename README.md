@@ -112,6 +112,36 @@ Status is never set by hand:
 
 ---
 
+## Assumptions & notes
+
+Where the brief left a decision open, this is what I assumed:
+
+**Accounts and data**
+- There is no sign-up. Authors and admins come from the provided sample data (`npm run seed`), and all demo authors share the same password (`author123`).
+- Book, sales and royalty figures are read-only in the portal: they come from BookLeaf's systems (here, the sample data). The portal shows them but doesn't process payouts.
+- Books still in production (e.g. BK013, BK015) have no MRP, ISBN or publication date yet, so the UI says *not yet published* instead of showing empty values.
+- Amounts are in INR. A pending royalty under ₹1,000 is labelled as rolling over to the next quarter, per the Knowledge Base payout threshold.
+
+**Tickets**
+- A ticket is about one of the author's own books or is *General / Account Level*. Authors can't raise tickets about other authors' books.
+- Attachments are optional: up to 3 files, JPG, PNG, WEBP or PDF, 2 MB each.
+- Status is fully automatic: **Pending** on creation and **Answered** after an admin reply (see above). Admins can't set it by hand.
+- Admins can assign a ticket only to themselves ("Assign to me"), which is all the brief asks for.
+- A ticket counts as overdue when it is still Pending after 24 h (Critical), 48 h (High), 72 h (Medium) or 120 h (Low). These thresholds are my assumption, based on the Knowledge Base's 24–48 h escalation timelines.
+- Authors can't reply inside an existing ticket; a follow-up is a new ticket.
+
+**AI**
+- I used **Google Gemini** rather than another provider. The brief lets the candidate choose, and the reasons are in [AI integration](#ai-integration).
+- The AI classifies every ticket when it's created. Admins can override the category and priority, and the override is recorded as `admin`.
+- AI drafts are **never sent automatically**. They're generated only when an admin clicks *Generate AI draft*, and the admin always reviews and sends them.
+- Prompts include only the Knowledge Base text from the brief. The AI isn't connected to any other company data or systems.
+
+**Environment**
+- Sessions are stored per browser tab, so an evaluator can be signed in as an author and as an admin side by side.
+- The live demo runs on Render's free tier: the first request after idling is slow, and uploaded files are lost on redeploy.
+
+---
+
 ## Architecture
 
 ```
