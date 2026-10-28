@@ -1,0 +1,43 @@
+# Render Blueprint: creates the API and the frontend from this repo.
+# Values marked sync: false are asked for when the Blueprint is created.
+services:
+  - type: web
+    name: bookleaf-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 1d
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-flash-lite-latest
+      - key: CORS_ORIGIN
+        sync: false # e.g. https://bookleaf-web.onrender.com
+
+  - type: web
+    name: bookleaf-web
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    routes:
+      # Single-page app: let React Router handle every path (so refreshing /author/tickets works).
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        sync: false # e.g. https://bookleaf-api.onrender.com

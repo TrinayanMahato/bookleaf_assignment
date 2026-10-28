@@ -9,7 +9,8 @@ import eventsRoutes from './routes/events.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 
 const app = express();
-app.use(cors());
+// In production only the deployed frontend may call the API; locally any origin is allowed.
+app.use(cors({ origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim()) : true }));
 app.use(express.json());
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));

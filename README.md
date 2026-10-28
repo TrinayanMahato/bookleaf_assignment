@@ -45,6 +45,7 @@ The login pages have a **Use demo account** button. Sessions are stored per brow
 | Variable | Purpose |
 |---|---|
 | `PORT` | API port (default `4000`) |
+| `CORS_ORIGIN` | Comma-separated frontend URL(s) allowed to call the API; empty allows any (local dev) |
 | `MONGODB_URI` | MongoDB connection string |
 | `JWT_SECRET`, `JWT_EXPIRES_IN` | Token signing secret and lifetime (e.g. `1d`) |
 | `GEMINI_API_KEY` | Google Gemini key. Leave empty to use the fallback classification |
@@ -53,6 +54,28 @@ The login pages have a **Use demo account** button. Sessions are stored per brow
 | `SEED_AUTHOR_PASSWORD`, `SEED_ADMIN_PASSWORD` | Passwords `npm run seed` gives the demo accounts |
 
 Keys and secrets live only in `.env`, which is gitignored. The frontend never sees the Gemini key.
+
+---
+
+## Deployment (Render + MongoDB Atlas)
+
+`render.yaml` is a Render Blueprint that creates both services: `bookleaf-api` (Node web service) and `bookleaf-web` (static site with an SPA rewrite).
+
+1. **Database:** create a free M0 cluster on MongoDB Atlas, add a database user, and under *Network Access* allow `0.0.0.0/0` (Render's free tier has no fixed IP). Copy the connection string and add the database name: `mongodb+srv://USER:PASS@cluster.xxxxx.mongodb.net/bookleaf`.
+2. **Seed it once from your machine:** `cd backend && MONGODB_URI="<atlas uri>" npm run seed`
+3. **Render:** *New → Blueprint*, connect this GitHub repo, and fill in the values it asks for:
+   - `MONGODB_URI`: the Atlas URI
+   - `GEMINI_API_KEY`: your Gemini key
+   - `CORS_ORIGIN`: `https://bookleaf-web.onrender.com` (the frontend's URL)
+   - `VITE_API_URL`: `https://bookleaf-api.onrender.com` (the API's URL)
+
+   `JWT_SECRET` is generated automatically. If Render gives a service a different URL, update `CORS_ORIGIN` / `VITE_API_URL` to match and redeploy (the frontend reads `VITE_API_URL` at build time).
+4. **Check it:** open `https://bookleaf-api.onrender.com/api/health`, then log in on the frontend with the demo accounts.
+
+Notes on the free tier:
+- The API sleeps after 15 minutes idle, so the first request takes about 30–50 s.
+- The disk is wiped on every redeploy, so uploaded attachments don't survive one (production would use S3; see below).
+- Live updates work as-is on a single instance.
 
 ---
 
